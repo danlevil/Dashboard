@@ -8,10 +8,11 @@ import IndicatorWeather from './components/IndicatorWeather';
 import TableWeather from './components/TableWeather';
 import ControlWeather from './components/ControlWeather';
 import LineChartWeather from './components/LineChartWeather';
+import Item from './interface/Item';
 
 interface Indicator {
   title?: String;
-  subtitle?: String;
+  subtitle?: String;  
   value?: String;
 }
 
@@ -19,131 +20,114 @@ function App() {
   //const [count, setCount] = useState(0)
     {/* Variable de estado y función de actualización */}
     let [indicators, setIndicators] = useState<Indicator[]>([])
-    let [owm, setOWM] = useState(localStorage.getItem("openWeatherMap"))
+    //let [owm, setOWM] = useState(localStorage.getItem("openWeatherMap"))
+    let [items, setItems] = useState<Item[]>([])
+    useEffect(() => {
+      let request = async () => {
+        let API_KEY = "74378b4b73518d16f213233942298cdf"
+        let response = await fetch(`https://api.openweathermap.org/data/2.5/forecast?q=Guayaquil&mode=xml&appid=${API_KEY}`)
+        let savedTexXML = await response.text();
 
-     {/* Hook: useEffect */}
-    useEffect(()=>{
+        let dataToItems : Item[] = new Array<Item>();
 
-    let request = async () => {
-        {/* Referencia a las claves del LocalStorage: openWeatherMap y expiringTime */}
-        let savedTextXML = localStorage.getItem("openWeatherMap") || "";
-        let expiringTime = localStorage.getItem("expiringTime");
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(savedTexXML, "application/xml");
 
-        {/* Obtenga la estampa de tiempo actual */}
-        let nowTime = (new Date()).getTime();
-        {/* Verifique si es que no existe la clave expiringTime o si la estampa de tiempo actual supera el tiempo de expiración */}
-        if(expiringTime === null || nowTime > parseInt(expiringTime)) {
+        let dataToIndicators: Indicator[] = new Array<Indicator>();
+        {/* 
+            Análisis, extracción y almacenamiento del contenido del XML 
+            en el arreglo de resultados
+        */}
 
+        let name = xml.getElementsByTagName("name")[0].innerHTML || ""
+        dataToIndicators.push({ "title": "Location", "subtitle": "City", "value": name })
 
-          {/* Request */}
-          let API_KEY = "OPENWEATHERMAP' API KEY"
-          let response = await fetch(`https://api.openweathermap.org/data/2.5/forecast?q=Guayaquil&mode=xml&appid=${API_KEY}`)
-          let savedTextXML = await response.text();
+        let timeArray = xml.getElementsByTagName("time");
+        let time = Array.from(timeArray).slice(0,6);
 
-          {/* Tiempo de expiración */}
-          let hours = 0.01
-          let delay = hours * 3600000
-          let expiringTime = nowTime + delay
+        let precipitationArray = xml.getElementsByTagName("precipitation");
+        let precipitation = Array.from(precipitationArray).slice(0,6);
 
+        let humidityArray = xml.getElementsByTagName("humidity");
+        let humidity = Array.from(humidityArray).slice(0,6);
 
-          {/* En el LocalStorage, almacene el texto en la clave openWeatherMap, estampa actual y estampa de tiempo de expiración */}
-          localStorage.setItem("openWeatherMap", savedTextXML)
-          localStorage.setItem("expiringTime", expiringTime.toString())
-          localStorage.setItem("nowTime", nowTime.toString())
+        let cloudsArray = xml.getElementsByTagName("clouds");
+        let clouds = Array.from(cloudsArray).slice(0,6);
 
-          {/* DateTime */}
-          localStorage.setItem("expiringDateTime", new Date(expiringTime).toString())
-          localStorage.setItem("nowDateTime", new Date(nowTime).toString())
-
-          {/* Modificación de la variable de estado mediante la función de actualización */ }
-          setOWM( savedTextXML )
+        for(let i=0;i<6;i++){
+          let fromString = time[i].getAttribute("from") || "";
+          let from =  fromString.split("T",2)[1];
+          console.log(from);
+          let toString = time[i].getAttribute("to") || "";
+          let to = toString.split("T",2)[1];
+          let probability = precipitation[i].getAttribute("probability") || "";
+          let value = humidity[i].getAttribute("value") || "";
+          let all = clouds[i].getAttribute("all") || "";
+          dataToItems.push({"dateStart":from,"dateEnd":to,"precipitation":probability,"humidity":value,"clouds":all});
+          console.log("dateStart"+ from + " dateEnd" + to  + " precipitation "  + probability  + " humidity "  +  value  + " clouds "  + all)
         }
-        if( savedTextXML ) {
+        setItems(dataToItems);
+        
+        let location = xml.getElementsByTagName("location")[1]
 
-          {/* XML Parser */}
-          const parser = new DOMParser();
-          const xml = parser.parseFromString(savedTextXML, "application/xml");
-          {/* Arreglo para agregar los resultados */}
+        let latitude = location.getAttribute("latitude") || ""
+        dataToIndicators.push({ "title": "Location", "subtitle": "Latitude", "value": latitude })
 
-          let dataToIndicators : Indicator[] = new Array<Indicator>();
-          {/* 
-              Análisis, extracción y almacenamiento del contenido del XML 
-              en el arreglo de resultados
-          */}
+        let longitude = location.getAttribute("longitude") || ""
+        dataToIndicators.push({ "title": "Location", "subtitle": "Longitude", "value": longitude })
 
-          let name = xml.getElementsByTagName("name")[0].innerHTML || ""
-          dataToIndicators.push({"title":"Location", "subtitle": "City", "value": name})
+        let altitude = location.getAttribute("altitude") || ""
+        dataToIndicators.push({ "title": "Location", "subtitle": "Altitude", "value": altitude })
 
-          let location = xml.getElementsByTagName("location")[1]
 
-          let latitude = location.getAttribute("latitude") || ""
-          dataToIndicators.push({ "title": "Location", "subtitle": "Latitude", "value": latitude })
+        setIndicators(dataToIndicators);
 
-          let longitude = location.getAttribute("longitude") || ""
-          dataToIndicators.push({ "title": "Location", "subtitle": "Longitude", "value": longitude })
-
-          let altitude = location.getAttribute("altitude") || ""
-          dataToIndicators.push({ "title": "Location", "subtitle": "Altitude", "value": altitude })
-
-          console.log( dataToIndicators )
-
-          {/* Modificación de la variable de estado mediante la función de actualización */}
-          setIndicators( dataToIndicators )
-        }
-    }
+      }
 
       request();
 
-  },[owm])
-  let renderIndicators = () => {
+    }, [])
 
-  return indicators
-      .map(
-          (indicator, idx) => (
-            <Grid key={idx} size={{ xs: 3, xl: 12 }}>
-                <IndicatorWeather 
-                    title={indicator["title"]} 
-                    subtitle={indicator["subtitle"]} 
-                    value={indicator["value"]} />
-            </Grid>
-          )
-      )
+    let renderIndicators = () => {
 
-  }  
+      return indicators
+              .map(
+                  (indicator, idx) => (
+                      <Grid key={idx} size={{ xs: 12, xl: 3 }}>
+                          <IndicatorWeather 
+                              title={indicator["title"]} 
+                              subtitle={indicator["subtitle"]} 
+                              value={indicator["value"]} />
+                      </Grid>
+                  )
+              )
+        
+    }
 
-  return (
-    <Grid container spacing={5}>
+    return (
 
-        {/* Indicadores */}
-        <Grid size={{ md: 3, xs: 12 }}> <IndicatorWeather title={'Indicator 1'} subtitle={'Unidad 1'} value={"1.23"} /> 
-        </Grid>
-        <Grid size={{md: 3, xs: 12  }}> <IndicatorWeather title={'Indicator 2'} subtitle={'Unidad 2'} value={"3.12"} />
-        </Grid>
-        <Grid size={{ md: 3, xs: 12  }}> <IndicatorWeather title={'Indicator 3'} subtitle={'Unidad 3'} value={"2.31"} />
-        </Grid>
-        <Grid size={{ md: 3, xs: 12 }}> <IndicatorWeather title={'Indicator 4'} subtitle={'Unidad 4'} value={"3.21"} />
+      <Grid container spacing={5}>
+
         {renderIndicators()}
-
-    </Grid>
-
         {/* Tabla */}
-        <Grid size={{md: 8, xs: 12  }}>
+        <Grid size={{ xs: 12, xl: 8 }}>
           <Grid container spacing={2}>
-              <Grid size={{ xs: 12, xl: 3 }}>
-                  <ControlWeather/>
-              </Grid>
-              <Grid size={{ xs: 12, xl: 9 }}>
-                  <TableWeather/>
-              </Grid>
+            <Grid size={{ xs: 12, xl: 3 }}>
+              <ControlWeather />
+            </Grid>
+            <Grid size={{ xs: 12, xl: 9 }}>
+              <TableWeather itemsIn ={items} />
+            </Grid>
           </Grid>
         </Grid>
 
         {/* Gráfico */}
-        <Grid size={{ md: 4, xl: 12  }}>
-          <LineChartWeather/>
+        <Grid size={{ xs: 12, xl: 4 }}>
+          <LineChartWeather />
         </Grid>
-    </Grid>
-)
-}
+
+      </Grid>
+    )
+    }
 
 export default App
